@@ -17,10 +17,17 @@ license {
     ],
 }
 
+genrule {
+    name: "protoc-gen-mmi2grpc-python-src-interfaces",
+    srcs: ["python/_build/protoc-gen-custom_grpc"],
+    cmd: "cp $(in) $(out)",
+    out: ["protoc-gen-custom_grpc.py"],
+}
+
 python_binary_host {
     name: "protoc-gen-custom_grpc",
-    main: "python/_build/protoc-gen-custom_grpc.py",
-    srcs: ["python/_build/protoc-gen-custom_grpc.py"],
+    main: "protoc-gen-custom_grpc.py",
+    srcs: [":protoc-gen-mmi2grpc-python-src-interfaces"],
     libs: ["libprotobuf-python"],
 }
 
