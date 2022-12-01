@@ -47,12 +47,15 @@ genrule {
     srcs: [
         "pandora/a2dp.proto",
         "pandora/host.proto",
+        "pandora/security.proto",
     ],
     out: [
         "pandora/a2dp_grpc.py",
         "pandora/a2dp_pb2.py",
         "pandora/host_grpc.py",
         "pandora/host_pb2.py",
+        "pandora/security_grpc.py",
+        "pandora/security_pb2.py",
     ]
 }
 
