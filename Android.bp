@@ -96,11 +96,14 @@ genrule {
          "    --python_out=$(genDir)" +
          "    $(in)",
     srcs: [
+        "pandora/asha.proto",
         "pandora/a2dp.proto",
         "pandora/host.proto",
         "pandora/security.proto",
     ],
     out: [
+        "pandora/asha_grpc.py",
+        "pandora/asha_pb2.py",
         "pandora/a2dp_grpc.py",
         "pandora/a2dp_pb2.py",
         "pandora/host_grpc.py",
