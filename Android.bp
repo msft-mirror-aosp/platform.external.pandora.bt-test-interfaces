@@ -103,12 +103,16 @@ genrule {
     ],
     out: [
         "pandora/asha_grpc.py",
+        "pandora/asha_grpc_aio.py",
         "pandora/asha_pb2.py",
         "pandora/a2dp_grpc.py",
+        "pandora/a2dp_grpc_aio.py",
         "pandora/a2dp_pb2.py",
         "pandora/host_grpc.py",
+        "pandora/host_grpc_aio.py",
         "pandora/host_pb2.py",
         "pandora/security_grpc.py",
+        "pandora/security_grpc_aio.py",
         "pandora/security_pb2.py",
     ]
 }
