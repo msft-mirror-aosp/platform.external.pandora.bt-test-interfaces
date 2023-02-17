@@ -126,6 +126,7 @@ def generate_type(imports: List[str], file: FileDescriptorProto, parent: Descrip
             dft = f'{type}.{desc.value[0].name}'
         else:
             dft = f'{type}()'
+            type = f"'{type}'"
     else:
         raise Exception(f'TODO: {field}')
 
@@ -151,9 +152,6 @@ def generate_message(imports: List[str], overrides: list[str], file: FileDescrip
     oneof: Dict[str, list[Tuple[str, str]]] = {}
     pb2 = os.path.basename(file.name).replace('.proto', '_pb2')
     base = f'{pb2}.{message.name}'
-    message_dict_lines: List[str] = [
-        f'class {message.name}Dict(TypedDict, total=False):',
-    ]
     message_lines: List[str] = [
         f'@dataclass',
         f'class {message.name}(Message):',
@@ -169,12 +167,10 @@ def generate_message(imports: List[str], overrides: list[str], file: FileDescrip
             oneof_name = message.oneof_decl[idx].name
             oneof.setdefault(oneof_name, [])
             oneof[oneof_name].append((name, type))
-            message_dict_lines.append(f'    {name}: {type}')
         else:
             parameters.append(f'{name}: {type} = {dft}')
             dft = dft.replace('[]', 'field(default_factory=list)').replace('{}', 'field(default_factory=dict)')
             message_lines.append(f'    {name}: {type} = {dft}')
-            message_dict_lines.append(f'    {name}: {type}')
 
     for oneof_name, oneof_fields in oneof.items():
         if len(message_lines) > 2: message_lines.append('')
@@ -186,17 +182,11 @@ def generate_message(imports: List[str], overrides: list[str], file: FileDescrip
     for oneof_name, oneof_fields in oneof.items():
         literals: str = ', '.join((f'Literal[\'{name}\']' for name, _ in oneof_fields))
 
-        message_lines.extend([
-            '',
-            '    @property',
-            f'    def {oneof_name}_variant(self) -> Union[{literals}, None]: ...'
-        ])
-
         overrides.extend([
-            f'def _{message.name}_{oneof_name}_variant(self) -> Optional[str]:',
+            f'def _{message.name}_{oneof_name}_variant(self: {message.name}) -> Optional[str]:',
             f'    return self.WhichOneof(\'{oneof_name}\')  # type: ignore',
             '',
-            f'setattr({base}, \'{oneof_name}_variant\', property(_{message.name}_{oneof_name}_variant))',
+            f'setattr({base}, \'{oneof_name}_variant\', _{message.name}_{oneof_name}_variant)',
             ''
         ])
 
@@ -214,13 +204,34 @@ def generate_message(imports: List[str], overrides: list[str], file: FileDescrip
         ])
 
         overrides.extend([
-            f'def _{message.name}_{oneof_name}(self) -> {type}:',
-            f'    variant: str = self.{oneof_name}_variant',
+            f'def _{message.name}_{oneof_name}(self: {message.name}) -> {type}:',
+            f'    variant: Optional[str] = self.{oneof_name}_variant()',
             f'    if variant is None: return None',
-            '\n'.join([f'    if variant == \'{name}\': return self.{name}' for name, _ in oneof_fields]),
+            '\n'.join([f'    if variant == \'{name}\': return unwrap(self.{name})' for name, _ in oneof_fields]),
             f'    raise Exception(\'Field `{oneof_name}` not found.\')',
             '',
             f'setattr({base}, \'{oneof_name}\', property(_{message.name}_{oneof_name}))',
+            ''
+        ])
+
+        message_lines.extend([
+            f'',
+            f'    class {oneof_name}_dict(TypedDict, total=False):',
+            '\n'.join([f'        {name}: {type}' for name, type in oneof_fields]),
+            f'',
+            f'    def {oneof_name}_variant(self) -> Union[{literals}, None]: ...'
+            f'',
+            f'    def {oneof_name}_asdict(self) -> \'{message.name}.{oneof_name}_dict\': ...'
+        ])
+
+        overrides.extend([
+            f'def _{message.name}_{oneof_name}_asdict(self: {message.name}) -> \'{message.name}.{oneof_name}_dict\':',
+            f'    variant: Optional[str] = self.{oneof_name}_variant()',
+            f'    if variant is None: return {{}}',
+            '\n'.join([f'    if variant == \'{name}\': return {{\'{name}\': unwrap(self.{name})}}' for name, _ in oneof_fields]),
+            f'    raise Exception(\'Field `{oneof_name}` not found.\')',
+            '',
+            f'setattr({base}, \'{oneof_name}_asdict\', _{message.name}_{oneof_name}_asdict)',
             ''
         ])
 
@@ -230,18 +241,12 @@ def generate_message(imports: List[str], overrides: list[str], file: FileDescrip
         message_lines.append('    pass')
     message_lines.append('')
 
-    if len(message_dict_lines) == 1:
-        message_dict_lines = []
-    else:
-        message_dict_lines.append('')
-
     message_lines.extend([
         f'setattr({message.name}, \'__new__\', lambda _, *args, **kwargs: {base}(*args, **kwargs))  # type: ignore',
         ''
     ])
 
-    message_dict_lines.extend(message_lines)
-    return message_dict_lines
+    return message_lines
 
 
 def generate_service_method(imports: List[str], file: FileDescriptorProto, service: ServiceDescriptorProto, method: MethodDescriptorProto, sync: bool = True) -> List[str]:
@@ -263,23 +268,37 @@ def generate_service_method(imports: List[str], file: FileDescriptorProto, servi
     if args: args = ', ' + args
 
     if output_mode == 'stream':
-        output_type_hint = f'Stream[{output_type}]'
+        if input_mode == 'stream':
+            output_type_hint = f'StreamStream[{input_type}, {output_type}]'
+        else:
+            output_type_hint = f'Stream[{output_type}]'
     else:
         output_type_hint = output_type if sync else f'Awaitable[{output_type}]'
 
+    if input_mode == 'stream' and output_mode == 'stream':
+        return (
+            f'def {method.name}(self, timeout: Optional[float] = None) -> {output_type_hint}:\n'
+            f'    tx: Sender[{input_type}] = Sender()\n'
+            f'    rx: Stream[{output_type}] = self.channel.{input_mode}_{output_mode}(  # type: ignore\n'
+            f"        '/{file.package}.{service.name}/{method.name}',\n"
+            f'        request_serializer={input_type_pb2}.SerializeToString,  # type: ignore\n'
+            f'        response_deserializer={output_type_pb2}.FromString  # type: ignore\n'
+            f'    )(tx)\n'
+            f'    return StreamStream(tx, rx)'
+        ).split('\n')
     if input_mode == 'stream':
         return (
             f'def {method.name}(self, iterator: {iterator_type}[{input_type}], timeout: Optional[float] = None) -> {output_type_hint}:\n'
-            f'    return self.channel.{input_mode}_{output_mode}(\n'
+            f'    return self.channel.{input_mode}_{output_mode}(  # type: ignore\n'
             f"        '/{file.package}.{service.name}/{method.name}',\n"
-            f'        request_serializer={input_type_pb2}.SerializeToString,  # type: ignore\n'  # type: ignore
+            f'        request_serializer={input_type_pb2}.SerializeToString,  # type: ignore\n'
             f'        response_deserializer={output_type_pb2}.FromString  # type: ignore\n'
             f'    )(iterator)'
         ).split('\n')
     else:
         return (
             f'def {method.name}(self{args}, wait_for_ready: Optional[bool] = None, timeout: Optional[float] = None) -> {output_type_hint}:\n'
-            f'    return self.channel.{input_mode}_{output_mode}(\n'
+            f'    return self.channel.{input_mode}_{output_mode}(  # type: ignore\n'
             f"        '/{file.package}.{service.name}/{method.name}',\n"
             f'        request_serializer={input_type_pb2}.SerializeToString,  # type: ignore\n'
             f'        response_deserializer={output_type_pb2}.FromString  # type: ignore\n'
@@ -378,7 +397,7 @@ def generate_add_servicer_to_server_method(imports: List[str], file: FileDescrip
         f'    }}\n'
         f'    generic_handler = grpc.method_handlers_generic_handler(  # type: ignore\n'
         f"        '{file.package}.{service.name}', rpc_method_handlers)\n"
-        f'    server.add_generic_rpc_handlers((generic_handler,))\n'
+        f'    server.add_generic_rpc_handlers((generic_handler,))  # type: ignore\n'
     ).split('\n')
 
 
@@ -409,17 +428,145 @@ from typing import Dict, Generator, Optional, List, Literal, Union, Iterator, As
 from google.protobuf.message import Message
 '''
 
-_EXTRAS = '''
-_T = TypeVar('_T', covariant=True)
-class Stream(Iterator[_T], grpc.Call, grpc.RpcContext): ...
+_UTILS_PY = '''# Copyright 2022 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Generated python gRPC helpers."""
+
+import asyncio
+import queue
+import grpc
+
+from typing import Any, AsyncIterable, AsyncIterator, Generic, Iterator, Optional, TypeVar
+
+
+_T_co = TypeVar('_T_co', covariant=True)
+_T = TypeVar('_T')
+
+
+def unwrap(optional: Optional[_T]) -> _T:
+    assert optional
+    return optional
+
+
+class Stream(Iterator[_T_co], grpc.RpcContext): ...
+
+
+class AioStream(AsyncIterable[_T_co], grpc.RpcContext): ...
+
+
+class Sender(Iterator[_T]):
+    _inner: queue.Queue[_T]
+
+    def __init__(self) -> None:
+        self._inner = queue.Queue()
+
+    def __iter__(self) -> Iterator[_T]:
+        return self
+
+    def __next__(self) -> _T:
+        return self._inner.get()
+
+    def send(self, item: _T) -> None:
+        self._inner.put(item)
+
+
+class AioSender(AsyncIterator[_T]):
+    _inner: asyncio.Queue[_T]
+
+    def __init__(self) -> None:
+        self._inner = asyncio.Queue()
+
+    def __iter__(self) -> AsyncIterator[_T]:
+        return self
+
+    async def __anext__(self) -> _T:
+        return await self._inner.get()
+
+    async def send(self, item: _T) -> None:
+        await self._inner.put(item)
+
+    def send_nowait(self, item: _T) -> None:
+        self._inner.put_nowait(item)
+
+
+class StreamStream(Generic[_T, _T_co], Iterator[_T_co], grpc.RpcContext):
+    _sender: Sender[_T]
+    _receiver: Stream[_T_co]
+
+    def __init__(self, sender: Sender[_T], receiver: Stream[_T_co]) -> None:
+        self._sender = sender
+        self._receiver = receiver
+
+    def send(self, item: _T) -> None:
+        self._sender.send(item)
+
+    def __iter__(self) -> Iterator[_T_co]:
+        return self._receiver.__iter__()
+
+    def __next__(self) -> _T_co:
+        return self._receiver.__next__()
+
+    def is_active(self) -> bool:
+        return self._receiver.is_active()  # type: ignore
+
+    def time_remaining(self) -> float:
+        return self._receiver.time_remaining()  # type: ignore
+
+    def cancel(self) -> None:
+        self._receiver.cancel()  # type: ignore
+
+    def add_callback(self, callback: Any) -> None:
+        self._receiver.add_callback(callback)  # type: ignore
+
+
+class AioStreamStream(Generic[_T, _T_co], AsyncIterator[_T_co], grpc.RpcContext):
+    _sender: AioSender[_T]
+    _receiver: AioStream[_T_co]
+
+    def __init__(self, sender: AioSender[_T], receiver: AioStream[_T_co]) -> None:
+        self._sender = sender
+        self._receiver = receiver
+
+    def __aiter__(self) -> AsyncIterator[_T_co]:
+        return self._receiver.__aiter__()
+
+    async def __anext__(self) -> _T_co:
+        return await self._receiver.__aiter__().__anext__()
+
+    async def send(self, item: _T) -> None:
+        await self._sender.send(item)
+
+    def send_nowait(self, item: _T) -> None:
+        self._sender.send_nowait(item)
+
+    def is_active(self) -> bool:
+        return self._receiver.is_active()  # type: ignore
+
+    def time_remaining(self) -> float:
+        return self._receiver.time_remaining()  # type: ignore
+
+    def cancel(self) -> None:
+        self._receiver.cancel()  # type: ignore
+
+    def add_callback(self, callback: Any) -> None:
+        self._receiver.add_callback(callback)  # type: ignore
 '''
 
-_AIO_EXTRAS = '''
-_T = TypeVar('_T', covariant=True)
-class Stream(AsyncIterator[_T], grpc.aio.Call, grpc.aio.RpcContext): ...
-'''
 
 _FILES: List[CodeGeneratorResponse.File] = []
+_UTILS_FILES: Set[str] = set()
 
 
 for file_name in _REQUEST.file_to_generate:
@@ -447,14 +594,29 @@ for file_name in _REQUEST.file_to_generate:
     enum_import_str = f'\nfrom {package} import ' + ', '.join([e.name for e in file.enum_type]) if len(file.enum_type) else ''
     message_import_str = f'\nfrom {package} import ' + ', '.join([m.name for m in file.message_type]) if len(file.message_type) else ''
 
+    utils_filename = file_name.replace(os.path.basename(file_name), '_utils.py')
+    if utils_filename not in _UTILS_FILES:
+        _UTILS_FILES.add(utils_filename)
+        _FILES.extend([
+            CodeGeneratorResponse.File(
+                name=utils_filename,
+                content=_UTILS_PY,
+            )
+        ])
+
+    super_package = package[:package.rindex('.')]
+
+    extras = f'from {super_package}._utils import unwrap, Sender, Stream, StreamStream'
+    aio_extras = f'from {super_package}._utils import unwrap, AioSender as Sender, AioStream as Stream, AioStreamStream as StreamStream'
+
     _FILES.extend([
         CodeGeneratorResponse.File(
             name=file_name.replace('.proto', '_grpc.py'),
-            content=f'{_HEADER}\n\n{imports_str}\n\n{enums}\n\n{messages}\n\n{_EXTRAS}\n\n{services}\n\n{servicers}\n\n{add_servicer_methods}\n\n{overrides_str}'
+            content=f'{_HEADER}\n\n{imports_str}\n\n{extras}\n\n\n\n{enums}\n\n{messages}\n\n{services}\n\n{servicers}\n\n{add_servicer_methods}\n\n{overrides_str}'
         ),
         CodeGeneratorResponse.File(
             name=file_name.replace('.proto', '_grpc_aio.py'),
-            content=f'{_HEADER}\n\n{imports_str}{enum_import_str}{message_import_str}\n\n{_AIO_EXTRAS}\n\n{aio_services}\n\n{aio_servicers}\n\n{aio_add_servicer_methods}'
+            content=f'{_HEADER}\n\n{imports_str}{enum_import_str}{message_import_str}\n\n{aio_extras}\n\n{aio_services}\n\n{aio_servicers}\n\n{aio_add_servicer_methods}'
         )
     ])
 
