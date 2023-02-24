@@ -17,17 +17,68 @@ license {
     ],
 }
 
+java_library {
+    name: "pandora-grpc-java",
+    visibility: ["//packages/modules/Bluetooth/android/pandora/server"],
+    srcs: [
+        "pandora/*.proto",
+    ],
+    static_libs: [
+        "grpc-java-lite",
+        "guava",
+        "javax_annotation-api_1.3.2",
+        "libprotobuf-java-lite",
+        "opencensus-java-api",
+        "pandora-proto-java",
+    ],
+    proto: {
+        include_dirs: [
+            "external/protobuf/src",
+            "external/pandora/bt-test-interfaces",
+        ],
+        plugin: "grpc-java-plugin",
+        output_params: [
+           "lite",
+        ],
+    },
+}
+
+java_library {
+    name: "pandora-proto-java",
+    visibility: [
+        "//packages/modules/Bluetooth/android/pandora/server",
+        "//packages/modules/Bluetooth/pandora/interfaces",
+    ],
+    srcs: [
+        "pandora/*.proto",
+        ":libprotobuf-internal-protos",
+    ],
+    static_libs: [
+        "libprotobuf-java-lite",
+    ],
+    proto: {
+        // Disable canonical path as this breaks the identification of
+        // well known protobufs
+        canonical_path_from_root: false,
+        type: "lite",
+        include_dirs: [
+            "external/protobuf/src",
+            "external/pandora/bt-test-interfaces",
+        ],
+    },
+}
+
 genrule {
-    name: "protoc-gen-mmi2grpc-python-src-interfaces",
+    name: "protoc-gen-pandora-python-src",
     srcs: ["python/_build/protoc-gen-custom_grpc"],
     cmd: "cp $(in) $(out)",
     out: ["protoc-gen-custom_grpc.py"],
 }
 
 python_binary_host {
-    name: "protoc-gen-custom_grpc",
+    name: "protoc-gen-pandora-python",
     main: "protoc-gen-custom_grpc.py",
-    srcs: [":protoc-gen-mmi2grpc-python-src-interfaces"],
+    srcs: [":protoc-gen-pandora-python-src"],
     libs: ["libprotobuf-python"],
 }
 
@@ -35,26 +86,30 @@ genrule {
     name: "pandora-python-src",
     tools: [
         "aprotoc",
-        "protoc-gen-custom_grpc"
+        "protoc-gen-pandora-python"
     ],
     cmd: "$(location aprotoc)" +
          "    -Iexternal/pandora/bt-test-interfaces" +
          "    -Iexternal/protobuf/src" +
-         "    --plugin=protoc-gen-grpc=$(location protoc-gen-custom_grpc)" +
+         "    --plugin=protoc-gen-grpc=$(location protoc-gen-pandora-python)" +
          "    --grpc_out=$(genDir)" +
          "    --python_out=$(genDir)" +
          "    $(in)",
     srcs: [
-        "pandora/a2dp.proto",
+        "pandora/asha.proto",
         "pandora/host.proto",
         "pandora/security.proto",
     ],
     out: [
-        "pandora/a2dp_grpc.py",
-        "pandora/a2dp_pb2.py",
+        "pandora/_utils.py",
+        "pandora/asha_grpc.py",
+        "pandora/asha_grpc_aio.py",
+        "pandora/asha_pb2.py",
         "pandora/host_grpc.py",
+        "pandora/host_grpc_aio.py",
         "pandora/host_pb2.py",
         "pandora/security_grpc.py",
+        "pandora/security_grpc_aio.py",
         "pandora/security_pb2.py",
     ]
 }
@@ -63,5 +118,14 @@ python_library_host {
     name: "pandora-python",
     srcs: [
         ":pandora-python-src",
+    ],
+}
+
+filegroup {
+    name: "pandora-protos",
+    srcs: [
+        "pandora/asha.proto",
+        "pandora/host.proto",
+        "pandora/security.proto",
     ],
 }
