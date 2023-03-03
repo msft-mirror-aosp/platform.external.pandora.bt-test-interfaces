@@ -83,7 +83,7 @@ python_binary_host {
 }
 
 genrule {
-    name: "pandora-python-src",
+    name: "pandora-python-gen-src",
     tools: [
         "aprotoc",
         "protoc-gen-pandora-python"
@@ -92,8 +92,8 @@ genrule {
          "    -Iexternal/pandora/bt-test-interfaces" +
          "    -Iexternal/protobuf/src" +
          "    --plugin=protoc-gen-grpc=$(location protoc-gen-pandora-python)" +
-         "    --grpc_out=$(genDir)" +
          "    --python_out=$(genDir)" +
+         "    --grpc_out=$(genDir)" +
          "    $(in)",
     srcs: [
         "pandora/asha.proto",
@@ -105,12 +105,25 @@ genrule {
         "pandora/asha_grpc.py",
         "pandora/asha_grpc_aio.py",
         "pandora/asha_pb2.py",
+        "pandora/asha_pb2.pyi",
         "pandora/host_grpc.py",
         "pandora/host_grpc_aio.py",
         "pandora/host_pb2.py",
+        "pandora/host_pb2.pyi",
         "pandora/security_grpc.py",
         "pandora/security_grpc_aio.py",
         "pandora/security_pb2.py",
+        "pandora/security_pb2.pyi",
+    ]
+}
+
+filegroup {
+    name: "pandora-python-src",
+    srcs: [":pandora-python-gen-src"],
+    exclude_srcs: [
+        ":pandora-python-gen-src{pandora/asha_pb2.pyi}",
+        ":pandora-python-gen-src{pandora/host_pb2.pyi}",
+        ":pandora-python-gen-src{pandora/security_pb2.pyi}",
     ]
 }
 
