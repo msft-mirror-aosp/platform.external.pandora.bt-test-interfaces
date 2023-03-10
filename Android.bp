@@ -20,9 +20,7 @@ license {
 java_library {
     name: "pandora-grpc-java",
     visibility: ["//packages/modules/Bluetooth/android/pandora/server"],
-    srcs: [
-        "pandora/*.proto",
-    ],
+    srcs: [":pandora-protos"],
     static_libs: [
         "grpc-java-lite",
         "guava",
@@ -66,72 +64,6 @@ java_library {
             "external/pandora/bt-test-interfaces",
         ],
     },
-}
-
-genrule {
-    name: "protoc-gen-pandora-python-src",
-    srcs: ["python/_build/protoc-gen-custom_grpc"],
-    cmd: "cp $(in) $(out)",
-    out: ["protoc-gen-custom_grpc.py"],
-}
-
-python_binary_host {
-    name: "protoc-gen-pandora-python",
-    main: "protoc-gen-custom_grpc.py",
-    srcs: [":protoc-gen-pandora-python-src"],
-    libs: ["libprotobuf-python"],
-}
-
-genrule {
-    name: "pandora-python-gen-src",
-    tools: [
-        "aprotoc",
-        "protoc-gen-pandora-python"
-    ],
-    cmd: "$(location aprotoc)" +
-         "    -Iexternal/pandora/bt-test-interfaces" +
-         "    -Iexternal/protobuf/src" +
-         "    --plugin=protoc-gen-grpc=$(location protoc-gen-pandora-python)" +
-         "    --python_out=$(genDir)" +
-         "    --grpc_out=$(genDir)" +
-         "    $(in)",
-    srcs: [
-        "pandora/asha.proto",
-        "pandora/host.proto",
-        "pandora/security.proto",
-    ],
-    out: [
-        "pandora/_utils.py",
-        "pandora/asha_grpc.py",
-        "pandora/asha_grpc_aio.py",
-        "pandora/asha_pb2.py",
-        "pandora/asha_pb2.pyi",
-        "pandora/host_grpc.py",
-        "pandora/host_grpc_aio.py",
-        "pandora/host_pb2.py",
-        "pandora/host_pb2.pyi",
-        "pandora/security_grpc.py",
-        "pandora/security_grpc_aio.py",
-        "pandora/security_pb2.py",
-        "pandora/security_pb2.pyi",
-    ]
-}
-
-filegroup {
-    name: "pandora-python-src",
-    srcs: [":pandora-python-gen-src"],
-    exclude_srcs: [
-        ":pandora-python-gen-src{pandora/asha_pb2.pyi}",
-        ":pandora-python-gen-src{pandora/host_pb2.pyi}",
-        ":pandora-python-gen-src{pandora/security_pb2.pyi}",
-    ]
-}
-
-python_library_host {
-    name: "pandora-python",
-    srcs: [
-        ":pandora-python-src",
-    ],
 }
 
 filegroup {
