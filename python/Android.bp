@@ -38,10 +38,6 @@ genrule {
         "pandora/py.typed",
         "pandora/__init__.py",
         "pandora/_utils.py",
-        "pandora/asha_grpc.py",
-        "pandora/asha_grpc_aio.py",
-        "pandora/asha_pb2.py",
-        "pandora/asha_pb2.pyi",
         "pandora/host_grpc.py",
         "pandora/host_grpc_aio.py",
         "pandora/host_pb2.py",
@@ -67,7 +63,6 @@ filegroup {
     name: "pandora-python-stubs",
     srcs: [
         ":pandora-python-gen-src{pandora/py.typed}",
-        ":pandora-python-gen-src{pandora/asha_pb2.pyi}",
         ":pandora-python-gen-src{pandora/host_pb2.pyi}",
         ":pandora-python-gen-src{pandora/security_pb2.pyi}",
     ],
