@@ -30,10 +30,13 @@ genrule {
          "    --plugin=protoc-gen-grpc=$(location protoc-gen-pandora-python)" +
          "    --python_out=$(genDir)" +
          "    --grpc_out=$(genDir)" +
-         "    $(in) &&" +
+         "    $(locations :pandora-protos) &&" +
          "touch $(genDir)/pandora/py.typed &&" +
          "touch $(genDir)/pandora/__init__.py",
-    srcs: [":pandora-protos"],
+    srcs: [
+        ":pandora-protos",
+        ":libprotobuf-internal-protos",
+    ],
     out: [
         "pandora/py.typed",
         "pandora/__init__.py",
