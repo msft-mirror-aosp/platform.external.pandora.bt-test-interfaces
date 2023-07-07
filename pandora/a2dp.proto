@@ -14,17 +14,15 @@
 
 syntax = "proto3";
 
+option java_outer_classname = "A2dpProto";
+
 package pandora;
 
 import "pandora/host.proto";
-import "google/protobuf/empty.proto";
-import "google/protobuf/wrappers.proto";
-
-option java_outer_classname = "A2DPProto";
 
 // Service to trigger A2DP (Advanced Audio Distribution Profile) procedures.
 //
-// Requirements for the implementer:
+// Requirements for the implementor:
 // - Streams must not be automatically opened, even if discovered.
 // - The `Host` service must be implemented
 //
@@ -71,25 +69,17 @@ service A2DP {
   // return it. The server must return the same sink only once.
   rpc WaitSink(WaitSinkRequest) returns (WaitSinkResponse);
   // Get if the stream is suspended
-  rpc IsSuspended(IsSuspendedRequest) returns (google.protobuf.BoolValue);
-  // Start an opened stream.
-  //
-  // The rpc must block until the stream has reached the
-  // AVDTP_STREAMING state (see [AVDTP] 9.1).
+  rpc IsSuspended(IsSuspendedRequest) returns (IsSuspendedResponse);
+  // Start a suspended stream.
   rpc Start(StartRequest) returns (StartResponse);
-  // Suspend a streaming stream.
-  //
-  // The rpc must block until the stream has reached the AVDTP_OPEN
-  // state (see [AVDTP] 9.1).
+  // Suspend a started stream.
   rpc Suspend(SuspendRequest) returns (SuspendResponse);
   // Close a stream, the source or sink tokens must not be reused afterwards.
   rpc Close(CloseRequest) returns (CloseResponse);
   // Get the `AudioEncoding` value of a stream
-  rpc GetAudioEncoding(GetAudioEncodingRequest)
-      returns (GetAudioEncodingResponse);
+  rpc GetAudioEncoding(GetAudioEncodingRequest) returns (GetAudioEncodingResponse);
   // Playback audio by a `Source`
-  rpc PlaybackAudio(stream PlaybackAudioRequest)
-      returns (PlaybackAudioResponse);
+  rpc PlaybackAudio(stream PlaybackAudioRequest) returns (PlaybackAudioResponse);
   // Capture audio from a `Sink`
   rpc CaptureAudio(CaptureAudioRequest) returns (stream CaptureAudioResponse);
 }
@@ -109,7 +99,7 @@ enum AudioEncoding {
 message Source {
   // Opaque value filled by the GRPC server, must not
   // be modified nor crafted.
-  bytes cookie = 1;
+  Connection connection = 1;
 }
 
 // A Token representing a Sink stream (see [A2DP] 2.2).
@@ -117,7 +107,7 @@ message Source {
 message Sink {
   // Opaque value filled by the GRPC server, must not
   // be modified nor crafted.
-  bytes cookie = 1;
+  Connection connection = 1;
 }
 
 // Request for the `OpenSource` method.
@@ -128,12 +118,10 @@ message OpenSourceRequest {
 
 // Response for the `OpenSource` method.
 message OpenSourceResponse {
-  // Result of the `OpenSource` call.
+  // Result of the `OpenSource` call:
+  // - If successful: a Source
   oneof result {
-    // Opened stream.
     Source source = 1;
-    // The Connection disconnected.
-    google.protobuf.Empty disconnected = 2;
   }
 }
 
@@ -145,12 +133,10 @@ message OpenSinkRequest {
 
 // Response for the `OpenSink` method.
 message OpenSinkResponse {
-  // Result of the `OpenSink` call.
+  // Result of the `OpenSink` call:
+  // - If successful: a Sink
   oneof result {
-    // Opened stream.
     Sink sink = 1;
-    // The Connection disconnected.
-    google.protobuf.Empty disconnected = 2;
   }
 }
 
@@ -162,12 +148,10 @@ message WaitSourceRequest {
 
 // Response for the `WaitSource` method.
 message WaitSourceResponse {
-  // Result of the `WaitSource` call.
+  // Result of the `WaitSource` call:
+  // - If successful: a Source
   oneof result {
-    // Awaited stream.
     Source source = 1;
-    // The Connection disconnected.
-    google.protobuf.Empty disconnected = 2;
   }
 }
 
@@ -179,12 +163,10 @@ message WaitSinkRequest {
 
 // Response for the `WaitSink` method.
 message WaitSinkResponse {
-  // Result of the `WaitSink` call.
+  // Result of the `WaitSink` call:
+  // - If successful: a Sink
   oneof result {
-    // Awaited stream.
     Sink sink = 1;
-    // The Connection disconnected.
-    google.protobuf.Empty disconnected = 2;
   }
 }
 
@@ -197,6 +179,11 @@ message IsSuspendedRequest {
   }
 }
 
+// Response for the `IsSuspended` method.
+message IsSuspendedResponse {
+  bool is_suspended = 1;
+}
+
 // Request for the `Start` method.
 message StartRequest {
   // Target of the start, either a Sink or a Source.
@@ -207,17 +194,7 @@ message StartRequest {
 }
 
 // Response for the `Start` method.
-message StartResponse {
-  // Result of the `Start` call.
-  oneof result {
-    // Stream successfully started.
-    google.protobuf.Empty started = 1;
-    // Stream is already in AVDTP_STREAMING state.
-    google.protobuf.Empty already_started = 2;
-    // The Connection disconnected.
-    google.protobuf.Empty disconnected = 3;
-  }
-}
+message StartResponse {}
 
 // Request for the `Suspend` method.
 message SuspendRequest {
@@ -229,17 +206,7 @@ message SuspendRequest {
 }
 
 // Response for the `Suspend` method.
-message SuspendResponse {
-  // Result of the `Suspend` call.
-  oneof result {
-    // Stream successfully suspended.
-    google.protobuf.Empty suspended = 1;
-    // Stream is already in AVDTP_OPEN state.
-    google.protobuf.Empty already_suspended = 2;
-    // The Connection disconnected.
-    google.protobuf.Empty disconnected = 3;
-  }
-}
+message SuspendResponse {}
 
 // Request for the `Close` method.
 message CloseRequest {
@@ -291,6 +258,6 @@ message CaptureAudioRequest {
 message CaptureAudioResponse {
   // Captured audio data.
   // The audio data is encoded in the specified `AudioEncoding` value
-  // obtained in response of a `GetAudioEncoding` method call.
+  // obained in response of a `GetAudioEncoding` method call.
   bytes data = 1;
 }
