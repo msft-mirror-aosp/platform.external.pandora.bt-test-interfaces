@@ -179,6 +179,7 @@ message DataTypes {
   bytes le_supported_features = 29; // LE Supported Features
   bytes manufacturer_specific_data = 30; // Manufacturer Specific Data
   DiscoverabilityMode le_discoverability_mode = 31; // Flags LE Discoverability Mode
+  DataTypes encrypted_data = 32;
 }
 
 // Response of the `ReadLocalAddress` method.
