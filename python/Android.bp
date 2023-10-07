@@ -49,6 +49,10 @@ genrule {
         "pandora/host_grpc_aio.py",
         "pandora/host_pb2.py",
         "pandora/host_pb2.pyi",
+        "pandora/l2cap_grpc.py",
+        "pandora/l2cap_grpc_aio.py",
+        "pandora/l2cap_pb2.py",
+        "pandora/l2cap_pb2.pyi",
         "pandora/security_grpc.py",
         "pandora/security_grpc_aio.py",
         "pandora/security_pb2.py",
@@ -72,6 +76,7 @@ filegroup {
         ":pandora-python-gen-src{pandora/py.typed}",
         ":pandora-python-gen-src{pandora/a2dp_pb2.pyi}",
         ":pandora-python-gen-src{pandora/host_pb2.pyi}",
+        ":pandora-python-gen-src{pandora/l2cap_pb2.pyi}",
         ":pandora-python-gen-src{pandora/security_pb2.pyi}",
     ],
 }
