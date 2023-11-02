@@ -16,6 +16,8 @@
 
 """Custom mmi2grpc gRPC compiler."""
 
+from __future__ import annotations
+
 import os
 import sys
 
@@ -144,10 +146,10 @@ def collect_field(imports: List[str], message: DescriptorProto, field: FieldDesc
 
 def collect_message(imports: List[str], message: DescriptorProto, local: Optional[FileDescriptorProto]) -> Tuple[
     List[Tuple[str, str, str]],
-    Dict[str, list[Tuple[str, str]]],
+    Dict[str, List[Tuple[str, str]]],
 ]:
     fields: List[Tuple[str, str, str]] = []
-    oneof: Dict[str, list[Tuple[str, str]]] = {}
+    oneof: Dict[str, List[Tuple[str, str]]] = {}
 
     for field in message.field:
         idx, name, type, dft, dft_import = collect_field(imports, message, field, local)
@@ -454,6 +456,8 @@ _HEADER = '''# Copyright 2022 Google LLC
 '''
 
 _UTILS_PY = f'''{_HEADER}
+
+from __future__ import annotations
 
 import asyncio
 import queue
