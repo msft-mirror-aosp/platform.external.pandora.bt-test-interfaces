@@ -69,7 +69,9 @@ java_library {
 filegroup {
     name: "pandora-protos",
     srcs: [
+        "pandora/a2dp.proto",
         "pandora/host.proto",
+        "pandora/l2cap.proto",
         "pandora/security.proto",
     ],
 }
