@@ -18,7 +18,7 @@ license {
 }
 
 java_library {
-    name: "pandora-grpc-java",
+    name: "pandora_stable-grpc-java",
     visibility: ["//packages/modules/Bluetooth/android/pandora/server"],
     srcs: [":pandora-protos"],
     static_libs: [
@@ -27,7 +27,7 @@ java_library {
         "javax_annotation-api_1.3.2",
         "libprotobuf-java-lite",
         "opencensus-java-api",
-        "pandora-proto-java",
+        "pandora_stable-proto-java",
     ],
     proto: {
         include_dirs: [
@@ -36,13 +36,13 @@ java_library {
         ],
         plugin: "grpc-java-plugin",
         output_params: [
-           "lite",
+            "lite",
         ],
     },
 }
 
 java_library {
-    name: "pandora-proto-java",
+    name: "pandora_stable-proto-java",
     visibility: [
         "//packages/modules/Bluetooth/android/pandora/server",
         "//packages/modules/Bluetooth/pandora/interfaces",
